@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 This module provides utility functions for parsing data in the .obo (Open Biomedical Ontologies)
 format and writing it out as a .tsv table for easier analysis.
@@ -15,6 +17,7 @@ import re
 import sys
 import tqdm
 import urllib
+import gzip
 
 from builtins import dict
 if sys.version_info >= (3, 0):
@@ -299,8 +302,10 @@ def _open_input_stream(path):
     else:
         if not os.path.isfile(path):
             raise ValueError("File not found: %s" % path)
-
-        line_iterator = open(path)
+        if path.endswith(".gz"):
+            line_iterator = gzip.open(path, 'rt')
+        else:
+            line_iterator = open(path)
 
     return line_iterator
 
