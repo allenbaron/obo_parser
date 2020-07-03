@@ -311,8 +311,20 @@ def _open_input_stream(path):
             raise ValueError("File not found: %s" % path)
         if path.endswith(".gz"):
             line_iterator = gzip.open(path, 'rt')
+            try:
+                line_iterator.read(1)
+            except OSError:
+                print(".gz file is not a gzipped file")
+                quit()
+            line_iterator.seek(0)
         else:
             line_iterator = open(path)
+            try:
+                line_iterator.read(1)
+            except Exception:
+                print("File not recognized")
+                quit()
+            line_iterator.seek(0)
 
     return line_iterator
 
