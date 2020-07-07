@@ -56,16 +56,6 @@ def convert_obo_to_tsv(input_path, output_path=None, root_id=None, add_category_
     with _open_input_stream(input_path) as input_stream:
         obo_records_dict = parse_obo_format(input_stream)
 
-    # find root term
-    if root_id is None:
-        root_id = _compute_root_id(obo_records_dict)
-
-    _confirm_id_is_valid(root_id, obo_records_dict, label="root_id")
-
-    # add 'category' columns to records
-    if add_category_column:
-        compute_category_column(obo_records_dict, root_id=root_id)
-
     # print stats and output .tsv
     print_stats(obo_records_dict, input_path)
 
@@ -168,27 +158,7 @@ def print_stats(obo_records_dict, input_path):
         logger.info(message % locals())
 
 
-def _compute_root_id(obo_records_dict):
-    """Finds the top-level term in the heirarchy.
-    NOTE: this implementation assumes the ontology has a single root term, and doesn't have cycles.
-    """
-
-    if not obo_records_dict:
-        return None
-
-    # start with a random id and walk up the heirarchy to find a term that doesn't have a parent
-    term_id = next(iter(obo_records_dict))
-    while True:
-        parent_ids = obo_records_dict[term_id].get("is_a")
-        if parent_ids is None or len(parent_ids) == 0:
-            return term_id
-
-        _confirm_id_is_valid(parent_ids[0], obo_records_dict, label="%s's parent id" % term_id)
-
-        term_id = parent_ids[0]
-
-
-def get_substree(obo_records_dict, root_id, skip_record=None):
+def get_subtree(obo_records_dict, root_id, skip_record=None):
     """Generates .obo records that are either descendants of the given root_id or the root record
     itself.
 
@@ -205,6 +175,7 @@ def get_substree(obo_records_dict, root_id, skip_record=None):
     _confirm_id_is_valid(root_id, obo_records_dict, label='root_id')
 
     ids_to_process = collections.deque([root_id])
+
     processed_ids = set()
     while ids_to_process:
         next_id = ids_to_process.popleft()
@@ -218,6 +189,10 @@ def get_substree(obo_records_dict, root_id, skip_record=None):
         child_ids = record.get('children', [])
         ids_to_process.extend(child_ids)
 
+def yield_all(obo_records_dict):
+    for key, value in obo_records_dict.items():
+        record = value
+        yield record
 
 def _compute_children_column(obo_records_dict):
     """For each record that has child terms, compute a list of child term ids and store it in the
@@ -239,50 +214,6 @@ def _compute_children_column(obo_records_dict):
                 parent_record['children'] = []
 
             parent_record['children'].append(term_id)
-
-
-def compute_category_column(
-        obo_records_dict,
-        root_id,
-        add_category_id_column=True,
-        add_category_name_column=True):
-    """Adds a "category_id" and/or "category_name" column to each record that's a descendant of the
-    root term.
-
-    Args:
-        obo_records_dict (dict): data structure returned by parse_obo_format(..)
-        root_id (str): Only ontology terms that are either descendants of the
-            given id or have this id themselves are returned. For example, 'HP:0000118'.
-        add_category_id_column (bool): Whether to add a "category_id" to each record.
-        add_category_name_column (bool): Whether to add a "category_name" to each record.
-    """
-
-    _confirm_id_is_valid(root_id, obo_records_dict, label='root_id')
-
-    root_record = obo_records_dict[root_id]
-    root_child_ids = root_record.get('children', [])
-
-    if not root_child_ids:
-        logger.warn("root term has no child terms")
-        return
-
-    for category_id in root_child_ids:
-        category_name = obo_records_dict[category_id].get("name", "")
-
-        def is_category_already_assigned(record):
-            return 'category_id' in record or 'category_name' in record
-
-        category_subtree = get_substree(
-            obo_records_dict,
-            root_id=category_id,
-            skip_record=is_category_already_assigned
-        )
-
-        for record in category_subtree:
-            if add_category_id_column:
-                record['category_id'] = category_id
-            if add_category_name_column:
-                record['category_name'] = category_name
 
 
 def _open_input_stream(path):
@@ -342,7 +273,13 @@ def write_tsv(obo_records_dict, output_stream, root_id=None, separator=", "):
     header = _compute_tsv_header(obo_records_dict.values())
     output_stream.write("\t".join([RENAME_COLUMNS.get(column, column) for column in header]))
     output_stream.write("\n")
-    for record in get_substree(obo_records_dict, root_id):
+
+    if root_id is not None:
+        records = get_subtree(obo_records_dict, root_id)
+    else:
+        records = yield_all(obo_records_dict)
+
+    for record in records:
         row = []
         for tag in header:
             value = record.get(tag)
@@ -385,5 +322,4 @@ if __name__ == "__main__":
         args.input_path,
         output_path=args.output_path,
         root_id=args.root_id,
-        add_category_column=args.add_category_column,
     )
