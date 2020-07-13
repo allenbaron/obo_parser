@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 This module provides utility functions for parsing data in the .obo (Open Biomedical Ontologies)
 format and writing it out as a .tsv table for easier analysis.
@@ -13,7 +15,6 @@ import logging
 import os
 import re
 import sys
-import tqdm
 import urllib
 import gzip
 
@@ -96,8 +97,6 @@ def parse_obo_format(lines):
     obo_records_dict = collections.OrderedDict()
     current_stanza_type = None
     current_record = None
-    if logger.isEnabledFor(logging.INFO):
-        lines = tqdm.tqdm(lines, unit=" lines")
 
     for line in lines:
         if line.startswith("["):
