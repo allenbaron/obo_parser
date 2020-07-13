@@ -54,15 +54,20 @@ def convert_obo_to_tsv(input_path, output_path=None, root_id=None, add_category_
     with _open_input_stream(input_path) as input_stream:
         obo_records_dict = parse_obo_format(input_stream)
 
-    # find root term
+    # find root term [default]
     if root_id is None:
         root_id = _compute_root_id(obo_records_dict)
+    elif root_id == "return_all":
+        root_id = None
 
-    _confirm_id_is_valid(root_id, obo_records_dict, label="root_id")
+    if root_id is not None:
+        _confirm_id_is_valid(root_id, obo_records_dict, label="root_id")
 
-    # add 'category' columns to records
-    if add_category_column:
-        compute_category_column(obo_records_dict, root_id=root_id)
+        # add 'category' columns to records, if root_id
+        if add_category_column:
+            compute_category_column(obo_records_dict, root_id=root_id)
+
+        print(root_id)
 
     # print stats and output .tsv
     print_stats(obo_records_dict, input_path)
@@ -216,6 +221,10 @@ def get_subtree(obo_records_dict, root_id, skip_record=None):
         child_ids = record.get('children', [])
         ids_to_process.extend(child_ids)
 
+def yield_all(obo_records_dict):
+    for key, value in obo_records_dict.items():
+        record = value
+        yield record
 
 def _compute_children_column(obo_records_dict):
     """For each record that has child terms, compute a list of child term ids and store it in the
@@ -340,7 +349,13 @@ def write_tsv(obo_records_dict, output_stream, root_id=None, separator=", "):
     header = _compute_tsv_header(obo_records_dict.values())
     output_stream.write("\t".join([RENAME_COLUMNS.get(column, column) for column in header]))
     output_stream.write("\n")
-    for record in get_subtree(obo_records_dict, root_id):
+
+    if root_id is not None:
+        records = get_subtree(obo_records_dict, root_id)
+    else:
+        records = yield_all(obo_records_dict)
+
+    for record in records:
         row = []
         for tag in header:
             value = record.get(tag)
@@ -366,9 +381,12 @@ if __name__ == "__main__":
     p.add_argument("-o", "--output-path", help="output .tsv file path. Defaults to standard out.")
     p.add_argument("-r", "--root-id", help="If specified, ignore ontology terms that are not "
         "either descendants of the given id or have this id themselves. For example: 'HP:0000118'.")
+    p.add_argument("-a", "--return_all", action="store_true", help="Return all records instead of "
+        "computing root-id [default], ignored if --root-id specified.")
     p.add_argument("-c", "--add-category-column", action="store_true", help="add a 'category' "
         "column to the output .tsv file which lists each term's top-level category. A top-level "
-        "category is a term that's a direct child of the ontology's root term.")
+        "category is a term that's a direct child of the ontology's root term. If --return_all "
+        "applies this is ignored.")
     p.add_argument("input_path", help=".obo file url or local file path. For example: "
         "http://purl.obolibrary.org/obo/hp.obo")
     p.add_argument("-v", "--verbose", action="store_true", help="Print stats and other info")
@@ -378,6 +396,10 @@ if __name__ == "__main__":
         logger.setLevel(logging.INFO)
     else:
         logger.setLevel(logging.WARN)
+
+    if args.return_all and args.root_id is None:
+        args.root_id = "return_all"
+
 
     convert_obo_to_tsv(
         args.input_path,
