@@ -185,7 +185,7 @@ def _compute_root_id(obo_records_dict):
         term_id = parent_ids[0]
 
 
-def get_substree(obo_records_dict, root_id, skip_record=None):
+def get_subtree(obo_records_dict, root_id, skip_record=None):
     """Generates .obo records that are either descendants of the given root_id or the root record
     itself.
 
@@ -269,7 +269,7 @@ def compute_category_column(
         def is_category_already_assigned(record):
             return 'category_id' in record or 'category_name' in record
 
-        category_subtree = get_substree(
+        category_subtree = get_subtree(
             obo_records_dict,
             root_id=category_id,
             skip_record=is_category_already_assigned
@@ -337,7 +337,7 @@ def write_tsv(obo_records_dict, output_stream, root_id=None, separator=", "):
     header = _compute_tsv_header(obo_records_dict.values())
     output_stream.write("\t".join([RENAME_COLUMNS.get(column, column) for column in header]))
     output_stream.write("\n")
-    for record in get_substree(obo_records_dict, root_id):
+    for record in get_subtree(obo_records_dict, root_id):
         row = []
         for tag in header:
             value = record.get(tag)

@@ -10,7 +10,7 @@ else:
 
 
 from obo_parser import _open_input_stream, parse_obo_format, _compute_tsv_header, \
-    compute_category_column, _compute_root_id, get_substree, \
+    compute_category_column, _compute_root_id, get_subtree, \
     _confirm_id_is_valid, print_stats, write_tsv, logger
 
 OBO_FILE_PATH = os.path.join(os.path.dirname(__file__), "data/hpo_subset.obo")
@@ -85,7 +85,7 @@ class ParserTests(unittest.TestCase):
 
     def test_get_subtree(self):
         subtree = {
-            record['id']: record for record in get_substree(self.obo_records_dict, 'HP:0000118')
+            record['id']: record for record in get_subtree(self.obo_records_dict, 'HP:0000118')
         }
         self.assertFalse('HP:000001' in subtree)
         self.assertTrue('HP:0000118' in subtree)
@@ -97,7 +97,7 @@ class ParserTests(unittest.TestCase):
 
         for root_id in ['HP:0000118', 'HP:0000479']:
             subtree = {
-                record['id']: record for record in get_substree(self.obo_records_dict, root_id)
+                record['id']: record for record in get_subtree(self.obo_records_dict, root_id)
             }
 
             # unlink subtree from parent tree
